@@ -31,6 +31,7 @@ const TOKEN_ENTANGLER_PROGRAM = "qntmGodpGkrM42mN68VCZHXnKqDCT8rdY23wFcXCLPd";
 const REFERENCE_PAIR = "J2V5Qipz1u7jN3k9LB8WSsjFrJ96fU3bAVvgUnJBQ7i4";
 const REFERENCE_MINT_B = "4ALFFRzUhV3bqBeu4LNoTA5ua5oDeXa9DJ15Sn2ap2v4";
 const OUTPUT_PATH = path.join(process.cwd(), "data", "pairs.json");
+const PUBLIC_OUTPUT_PATH = path.join(process.cwd(), "public", "data", "pairs.json");
 const RAW_PAIRS_PATH = path.join(process.cwd(), "data", "raw-pairs.json");
 const TOKEN_A_CACHE_PATH = path.join(process.cwd(), "data", "token-a-cache.json");
 const MINT_DATE_CACHE_PATH = path.join(process.cwd(), "data", "mint-date-cache.json");
@@ -156,8 +157,9 @@ async function main() {
   }
 
   await writeJsonFileAtomic(OUTPUT_PATH, data);
+  await writeJsonFileAtomic(PUBLIC_OUTPUT_PATH, data);
   console.log(
-    `Wrote ${data.originalTokens.length} original FT records, ${data.nfts.length} NFT records, and ${outputPairCount} entangled links to ${OUTPUT_PATH}.`
+    `Wrote ${data.originalTokens.length} original FT records, ${data.nfts.length} NFT records, and ${outputPairCount} entangled links to ${OUTPUT_PATH} and ${PUBLIC_OUTPUT_PATH}.`
   );
 }
 
