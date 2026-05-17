@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import PairTable from "@/components/PairTable";
-import type { ProvenanceData, ProvenanceRecord } from "@/lib/types";
+import { getStats, normalizeProvenanceData } from "@/lib/provenance";
+import type { ProvenanceData } from "@/lib/types";
 
 export default function ProvenanceExplorer() {
   const [data, setData] = useState<ProvenanceData | null>(null);
@@ -75,12 +77,12 @@ export default function ProvenanceExplorer() {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Stat label="Original FT tokens" value={stats?.originalFtTokens} />
-                <Stat label="Original NFT mints" value={stats?.originalNftMints} />
-                <Stat label="Entangled NFT mints" value={stats?.entangledNftMints} />
-                <Stat label="NFTs exchanged" value={stats?.exchanged} />
-                <Stat label="Awaiting exchange" value={stats?.awaitingExchange} />
-                <Stat label="Burned NFTs" value={stats?.burnedNfts} />
+                <Stat label="Original FT tokens" value={stats?.originalFtTokens} href="/explore/original-ft" />
+                <Stat label="Original NFT mints" value={stats?.originalNftMints} href="/explore/original-nft" />
+                <Stat label="Entangled NFT mints" value={stats?.entangledNftMints} href="/explore/entangled-nft" />
+                <Stat label="NFTs exchanged" value={stats?.exchanged} href="/explore/exchanged" />
+                <Stat label="Awaiting exchange" value={stats?.awaitingExchange} href="/explore/awaiting-exchange" />
+                <Stat label="Burned NFTs" value={stats?.burnedNfts} href="/explore/burned" />
               </div>
             </div>
           </div>
@@ -102,51 +104,14 @@ export default function ProvenanceExplorer() {
   );
 }
 
-function normalizeProvenanceData(value: unknown): ProvenanceData {
-  if (Array.isArray(value)) {
-    const originalTokens = value as ProvenanceRecord[];
-    return {
-      originalTokens,
-      nfts: originalTokens.flatMap((record) =>
-        record.pairs.map((pair) => ({
-          tokenB: pair.tokenB,
-          tokenA: record.tokenA,
-          entangledPairAddress: pair.entangledPairAddress,
-          swapped: pair.swapped
-        }))
-      )
-    };
-  }
-
-  return value as ProvenanceData;
-}
-
-function getStats(data: ProvenanceData) {
-  const entangledNftMints = data.nfts.filter((record) => nftBucket(record) === "entangled-nft").length;
-  const originalNftMints = data.nfts.length - entangledNftMints;
-  const exchangeEligibleNfts = data.nfts.filter((record) => record.entangledPairAddress);
-  const exchanged = exchangeEligibleNfts.filter((record) => record.swapped).length;
-  const burnedNfts = data.nfts.filter((record) => record.tokenB.lifecycleStatus === "burned").length;
-
-  return {
-    originalFtTokens: data.originalTokens.length,
-    originalNftMints,
-    entangledNftMints,
-    exchanged,
-    awaitingExchange: exchangeEligibleNfts.length - exchanged,
-    burnedNfts
-  };
-}
-
-function nftBucket(record: ProvenanceData["nfts"][number]) {
-  return record.provenanceBucket ?? (record.entangledPairAddress ? "entangled-nft" : "original-nft");
-}
-
-function Stat({ label, value }: { label: string; value?: number }) {
+function Stat({ label, value, href }: { label: string; value?: number; href: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+    <Link
+      href={href}
+      className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-solana-purple/70 hover:bg-white/[0.07]"
+    >
       <div className="text-xl font-bold text-white md:text-2xl">{typeof value === "number" ? value.toLocaleString() : "..."}</div>
       <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{label}</div>
-    </div>
+    </Link>
   );
 }

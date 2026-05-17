@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { nftBucket, type TableViewMode } from "@/lib/provenance";
 import type { NftRecord, OriginalTokenRecord, ProvenanceData, ProvenancePair, TokenA, TokenB } from "@/lib/types";
 
-type ViewMode = "original-ft" | "original-nft" | "entangled-nft";
+type ViewMode = TableViewMode;
 type SortMode =
   | "mintNumber"
   | "currentOwner"
@@ -20,9 +21,17 @@ type SortDirection = "asc" | "desc";
 const TEAM_WALLET = "4nuNUbvQQ6hsYLFB9yAeDdhHRbbxa3vHQwhBbMkD66Sf";
 const PAGE_SIZE = 100;
 
-export default function PairTable({ data }: { data: ProvenanceData }) {
+export default function PairTable({
+  data,
+  initialViewMode = "original-ft",
+  lockedViewMode = false
+}: {
+  data: ProvenanceData;
+  initialViewMode?: ViewMode;
+  lockedViewMode?: boolean;
+}) {
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("original-ft");
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [sortMode, setSortMode] = useState<SortMode>("mintNumber");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -56,6 +65,10 @@ export default function PairTable({ data }: { data: ProvenanceData }) {
   useEffect(() => {
     setPage(1);
   }, [query, sortDirection, sortMode, viewMode]);
+
+  useEffect(() => {
+    setViewMode(initialViewMode);
+  }, [initialViewMode]);
 
   useEffect(() => {
     if (viewMode === "original-nft" && (sortMode === "tokenAMint" || sortMode === "swapStatus" || sortMode === "tokenType" || sortMode === "nftCount")) {
@@ -122,17 +135,19 @@ export default function PairTable({ data }: { data: ProvenanceData }) {
               Showing <span className="font-semibold text-white">{visibleCount.toLocaleString()}</span> of{" "}
               <span className="font-semibold text-white">{totalCount.toLocaleString()}</span>
             </div>
-            <div className="flex flex-wrap rounded-2xl border border-white/10 bg-black/30 p-1">
-              <ModeButton active={viewMode === "original-ft"} onClick={() => setViewMode("original-ft")}>
-                Original FT Tokens
-              </ModeButton>
-              <ModeButton active={viewMode === "original-nft"} onClick={() => setViewMode("original-nft")}>
-                Original NFT Mints
-              </ModeButton>
-              <ModeButton active={viewMode === "entangled-nft"} onClick={() => setViewMode("entangled-nft")}>
-                Entangled NFT Mints
-              </ModeButton>
-            </div>
+            {!lockedViewMode ? (
+              <div className="flex flex-wrap rounded-2xl border border-white/10 bg-black/30 p-1">
+                <ModeButton active={viewMode === "original-ft"} onClick={() => setViewMode("original-ft")}>
+                  Original FT Tokens
+                </ModeButton>
+                <ModeButton active={viewMode === "original-nft"} onClick={() => setViewMode("original-nft")}>
+                  Original NFT Mints
+                </ModeButton>
+                <ModeButton active={viewMode === "entangled-nft"} onClick={() => setViewMode("entangled-nft")}>
+                  Entangled NFT Mints
+                </ModeButton>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -980,10 +995,6 @@ function sortNftRows(rows: NftRecord[], sortMode: SortMode, sortDirection: SortD
 
     return result * direction || a.tokenB.mint.localeCompare(b.tokenB.mint);
   });
-}
-
-function nftBucket(row: NftRecord): Exclude<ViewMode, "original-ft"> {
-  return row.provenanceBucket ?? (row.entangledPairAddress ? "entangled-nft" : "original-nft");
 }
 
 function recordMatches(record: OriginalTokenRecord, query: string) {
