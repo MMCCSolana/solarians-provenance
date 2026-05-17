@@ -37,11 +37,12 @@ export type TokenB = {
   image: string | null;
   currentOwner: string | null;
   mintedAt?: string | null;
+  lifecycleStatus?: "active" | "burned";
   attributes?: Record<string, string | number | boolean | null>;
 };
 
 export type ProvenancePair = {
-  entangledPairAddress: string;
+  entangledPairAddress: string | null;
   tokenB: TokenB;
   swapped: boolean;
 };
@@ -55,6 +56,7 @@ export type NftRecord = {
   tokenB: TokenB;
   tokenA: TokenA | null;
   entangledPairAddress: string | null;
+  provenanceBucket?: "original-nft" | "entangled-nft";
   swapped: boolean;
 };
 

@@ -80,6 +80,7 @@ export default function ProvenanceExplorer() {
                 <Stat label="Entangled NFT mints" value={stats?.entangledNftMints} />
                 <Stat label="NFTs exchanged" value={stats?.exchanged} />
                 <Stat label="Awaiting exchange" value={stats?.awaitingExchange} />
+                <Stat label="Burned NFTs" value={stats?.burnedNfts} />
               </div>
             </div>
           </div>
@@ -121,17 +122,24 @@ function normalizeProvenanceData(value: unknown): ProvenanceData {
 }
 
 function getStats(data: ProvenanceData) {
-  const entangledNftMints = data.nfts.filter((record) => record.entangledPairAddress).length;
+  const entangledNftMints = data.nfts.filter((record) => nftBucket(record) === "entangled-nft").length;
   const originalNftMints = data.nfts.length - entangledNftMints;
-  const exchanged = data.nfts.filter((record) => record.entangledPairAddress && record.swapped).length;
+  const exchangeEligibleNfts = data.nfts.filter((record) => record.entangledPairAddress);
+  const exchanged = exchangeEligibleNfts.filter((record) => record.swapped).length;
+  const burnedNfts = data.nfts.filter((record) => record.tokenB.lifecycleStatus === "burned").length;
 
   return {
     originalFtTokens: data.originalTokens.length,
     originalNftMints,
     entangledNftMints,
     exchanged,
-    awaitingExchange: entangledNftMints - exchanged
+    awaitingExchange: exchangeEligibleNfts.length - exchanged,
+    burnedNfts
   };
+}
+
+function nftBucket(record: ProvenanceData["nfts"][number]) {
+  return record.provenanceBucket ?? (record.entangledPairAddress ? "entangled-nft" : "original-nft");
 }
 
 function Stat({ label, value }: { label: string; value?: number }) {

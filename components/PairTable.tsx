@@ -30,8 +30,8 @@ export default function PairTable({ data }: { data: ProvenanceData }) {
 
   const records = data.originalTokens;
   const nftRows = data.nfts;
-  const originalNftRows = useMemo(() => nftRows.filter((row) => !row.entangledPairAddress), [nftRows]);
-  const entangledNftRows = useMemo(() => nftRows.filter((row) => row.entangledPairAddress), [nftRows]);
+  const originalNftRows = useMemo(() => nftRows.filter((row) => nftBucket(row) === "original-nft"), [nftRows]);
+  const entangledNftRows = useMemo(() => nftRows.filter((row) => nftBucket(row) === "entangled-nft"), [nftRows]);
   const activeNftRows = viewMode === "original-nft" ? originalNftRows : entangledNftRows;
 
   const filteredRecords = useMemo(() => {
@@ -520,7 +520,10 @@ function NftTable({
                     {formatMintNumber(row.tokenB.mintNumber)}
                   </td>
                   <td className="max-w-64 px-4 py-4 font-medium text-white">
-                    <MagicEdenLink mint={row.tokenB.mint}>{row.tokenB.name || "Unnamed Solarian"}</MagicEdenLink>
+                    <div className="flex flex-col gap-2">
+                      <MagicEdenLink mint={row.tokenB.mint}>{row.tokenB.name || "Unnamed Solarian"}</MagicEdenLink>
+                      <LifecycleBadge status={row.tokenB.lifecycleStatus} />
+                    </div>
                   </td>
                   {isEntangledView ? (
                     <td className="px-4 py-4">
@@ -538,7 +541,11 @@ function NftTable({
                   </td>
                   {isEntangledView ? (
                     <td className="px-4 py-4">
-                      <StatusBadge swapped={row.swapped} />
+                      {row.entangledPairAddress ? (
+                        <StatusBadge swapped={row.swapped} />
+                      ) : (
+                        <StatusBadge swapped={false} label="No Entangler record" />
+                      )}
                     </td>
                   ) : null}
                 </tr>
@@ -602,6 +609,11 @@ function NftExpansion({ record }: { record: NftRecord }) {
             <Detail label="Current Owner">
               <NullableAddress address={record.tokenB.currentOwner} full />
             </Detail>
+            {record.tokenB.lifecycleStatus ? (
+              <Detail label="Lifecycle">
+                <LifecycleBadge status={record.tokenB.lifecycleStatus} />
+              </Detail>
+            ) : null}
             <Attributes attributes={record.tokenB.attributes} />
           </div>
         </div>
@@ -866,6 +878,18 @@ function StatusBadge({ swapped, label }: { swapped: boolean; label?: string }) {
   );
 }
 
+function LifecycleBadge({ status }: { status?: TokenB["lifecycleStatus"] }) {
+  if (status !== "burned") {
+    return null;
+  }
+
+  return (
+    <span className="w-fit rounded-full bg-red-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-red-200">
+      Burned
+    </span>
+  );
+}
+
 function Detail({
   label,
   value,
@@ -958,6 +982,10 @@ function sortNftRows(rows: NftRecord[], sortMode: SortMode, sortDirection: SortD
   });
 }
 
+function nftBucket(row: NftRecord): Exclude<ViewMode, "original-ft"> {
+  return row.provenanceBucket ?? (row.entangledPairAddress ? "entangled-nft" : "original-nft");
+}
+
 function recordMatches(record: OriginalTokenRecord, query: string) {
   const normalized = query.trim().toLowerCase();
 
@@ -1003,6 +1031,7 @@ function searchableRow(row: NftRecord) {
     row.tokenA?.metadata?.name,
     row.tokenA?.metadata?.symbol,
     row.tokenA?.metadata?.description,
+    row.provenanceBucket,
     ...(row.tokenA?.originalRecipients ?? []),
     ...(row.tokenA?.currentHolders.map((holder) => holder.owner) ?? []),
     row.entangledPairAddress,
@@ -1028,6 +1057,7 @@ function searchableTokenB(tokenB: TokenB) {
     tokenB.mintNumber?.toString(),
     tokenB.currentOwner,
     tokenB.mintedAt,
+    tokenB.lifecycleStatus,
     ...Object.values(tokenB.attributes ?? {}).map((value) => String(value ?? ""))
   ];
 }

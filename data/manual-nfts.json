@@ -1,0 +1,55 @@
+[
+  {
+    "mint": "3ipiqewSV4xbZkqmUHsFJJdNk26MGbRH3hAH58C4DNqw",
+    "tokenAMint": "21pGEcgDEH96BwKNtaQtY3ukRjPZ87RFKQ2993EeEFTr",
+    "provenanceBucket": "entangled-nft",
+    "note": "Developer list gap fill for mint #894; FT link inferred from mint chronology between #893 and #895."
+  },
+  {
+    "mint": "6u6LHZwLPRsLK81Vqu6v9rXMyN7qD5ykcbE9t8LfjU8A",
+    "tokenAMint": "Ah2zPLSBmUBLmkkMfX4WNGp5nCxxkYzm997vHVNUWKm",
+    "provenanceBucket": "entangled-nft",
+    "note": "Developer list gap fill for mint #3694; FT link inferred from mint chronology between #3693 and #3695."
+  },
+  {
+    "mint": "9NmNjEWqUurDshMx7pTQ6H7HhzBjitegnEmR4bA6ZS3C",
+    "tokenAMint": "4xtYbNzTYhXgYNXffy2a4j4Jwqejnyd3tkNgr6xbuis8",
+    "provenanceBucket": "entangled-nft",
+    "note": "Developer list gap fill for mint #5419; FT link inferred from mint chronology between #5418 and #5420."
+  },
+  {
+    "mint": "9ugcPN9jGF2o1W9ptQTomxVW3Yanepddos1ZB9VyhC2b",
+    "tokenAMint": "A8HHZLPpNfea88Jo7sBd3UG1d3RUGxkroakTV2vnZ8Q",
+    "provenanceBucket": "entangled-nft",
+    "note": "Developer list gap fill for mint #3531."
+  },
+  {
+    "mint": "A9NDx3hkD76rfsxeVh6E5wnfrhyCXTZxeHeF43iRJqGt",
+    "tokenAMint": "wpNEE4be32s7jYWSGwXAiGVkgnDrgZ3QdheHrXcXNU4",
+    "provenanceBucket": "entangled-nft",
+    "note": "Developer list gap fill for mint #5342; FT link inferred from mint chronology between #5341 and #5343."
+  },
+  {
+    "mint": "25uGDrg4u6WHN9UmkmEpd8C8YCe2TbGCY3zKkCNUfC4t",
+    "provenanceBucket": "original-nft",
+    "lifecycleStatus": "burned",
+    "note": "Developer list burned mint #5950."
+  },
+  {
+    "mint": "8KtzEzcQ263ztSPsthYsAhN4jCta5SnnT5ZWK7LJ156D",
+    "provenanceBucket": "original-nft",
+    "lifecycleStatus": "burned",
+    "note": "Developer list burned mint #9671."
+  },
+  {
+    "mint": "8NN1X6b8iT6TQSeAnQTDj4Z5t1QMm48XgfKJ2p7MQ5vg",
+    "provenanceBucket": "original-nft",
+    "lifecycleStatus": "burned",
+    "note": "Developer list burned mint #8866."
+  },
+  {
+    "mint": "45HigP5wc68piXwvnyy5myuaT13nFULNWhx3yLF7bS8X",
+    "provenanceBucket": "original-nft",
+    "note": "Developer list missing original NFT mint #8166."
+  }
+]

@@ -16,6 +16,7 @@ import type {
   NftRecord,
   OriginalTokenRecord,
   ProvenanceData,
+  ProvenancePair,
   ProvenanceRecord,
   TokenA,
   TokenAMetadata,
@@ -36,6 +37,8 @@ const RAW_PAIRS_PATH = path.join(process.cwd(), "data", "raw-pairs.json");
 const TOKEN_A_CACHE_PATH = path.join(process.cwd(), "data", "token-a-cache.json");
 const MINT_DATE_CACHE_PATH = path.join(process.cwd(), "data", "mint-date-cache.json");
 const MINT_SNAPSHOT_PATH = path.join(process.cwd(), `${TEAM_WALLET}-mints.json`);
+const MANUAL_NFTS_PATH = path.join(process.cwd(), "data", "manual-nfts.json");
+const EXCLUDED_ORIGINAL_FTS_PATH = path.join(process.cwd(), "data", "excluded-original-fts.json");
 const EARLY_2021_UNIX = 1609459200;
 const MAX_TEAM_SIGNATURE_PAGES = Number(process.env.MAX_TEAM_SIGNATURE_PAGES ?? "0");
 const REQUEST_BATCH_SIZE = Number(process.env.REQUEST_BATCH_SIZE ?? "8");
@@ -115,6 +118,14 @@ type EnrichedPairLink = {
   tokenA: TokenA | null;
   tokenB: TokenB;
   swapped: boolean;
+};
+
+type ManualNftRecord = {
+  mint: string;
+  tokenAMint?: string;
+  provenanceBucket?: NftRecord["provenanceBucket"];
+  lifecycleStatus?: TokenB["lifecycleStatus"];
+  note?: string;
 };
 
 async function main() {
@@ -367,6 +378,38 @@ async function readMintSnapshot() {
   }
 }
 
+async function readManualNftRecords() {
+  try {
+    const parsed = JSON.parse(await readFile(MANUAL_NFTS_PATH, "utf8")) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      console.warn(`${MANUAL_NFTS_PATH} exists but is not an array.`);
+      return [];
+    }
+
+    return parsed.filter((record): record is ManualNftRecord => {
+      return Boolean(record && typeof record === "object" && "mint" in record && typeof record.mint === "string");
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function readExcludedOriginalFts() {
+  try {
+    const parsed = JSON.parse(await readFile(EXCLUDED_ORIGINAL_FTS_PATH, "utf8")) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      console.warn(`${EXCLUDED_ORIGINAL_FTS_PATH} exists but is not an array.`);
+      return [];
+    }
+
+    return parsed.filter((mint): mint is string => typeof mint === "string");
+  } catch {
+    return [];
+  }
+}
+
 async function readExistingTokenARecords() {
   const records = new Map<string, TokenA>();
 
@@ -529,6 +572,9 @@ function initializedMintsFromTransaction(
 
 async function enrichRecords(rawPairs: RawPair[], precursorCandidates: Set<string>, snapshotMints: string[]): Promise<ProvenanceData> {
   const rawPairsByTokenA = new Map<string, RawPair[]>();
+  const manualNfts = await readManualNftRecords();
+  const manualNftsByMint = new Map(manualNfts.map((record) => [record.mint, record]));
+  const excludedOriginalFts = new Set(await readExcludedOriginalFts());
 
   for (const pair of rawPairs) {
     const list = rawPairsByTokenA.get(pair.tokenAMint) ?? [];
@@ -536,8 +582,13 @@ async function enrichRecords(rawPairs: RawPair[], precursorCandidates: Set<strin
     rawPairsByTokenA.set(pair.tokenAMint, list);
   }
 
-  const tokenAMints = dedupe([...precursorCandidates, ...rawPairs.map((pair) => pair.tokenAMint), ...snapshotMints]);
-  const metadataMints = dedupe([...tokenAMints, ...rawPairs.map((pair) => pair.tokenBMint)]);
+  const tokenAMints = dedupe([
+    ...precursorCandidates,
+    ...rawPairs.map((pair) => pair.tokenAMint),
+    ...snapshotMints,
+    ...manualNfts.flatMap((record) => (record.tokenAMint ? [record.tokenAMint] : []))
+  ]);
+  const metadataMints = dedupe([...tokenAMints, ...rawPairs.map((pair) => pair.tokenBMint), ...manualNfts.map((record) => record.mint)]);
   const pairedTokenACount = [...rawPairsByTokenA.values()].filter((pairs) => pairs.length > 0).length;
   console.log(
     `Grouped ${rawPairs.length} raw NFT pair links under ${pairedTokenACount} paired Token A mints; ${tokenAMints.length} mint records need token-account classification.`
@@ -618,10 +669,11 @@ async function enrichRecords(rawPairs: RawPair[], precursorCandidates: Set<strin
 
   const validOriginalMints = tokenAMints.filter((mint) => {
     const tokenA = tokenARecords.get(mint);
-    return tokenA?.type === "true_fungible" && tokenA.metadata?.validOriginal;
+    return !excludedOriginalFts.has(mint) && tokenA?.type === "true_fungible" && tokenA.metadata?.validOriginal;
   });
   const validNftMints = dedupe([
     ...rawPairs.map((pair) => pair.tokenBMint),
+    ...manualNfts.map((record) => record.mint),
     ...tokenAMints.filter((mint) => {
       const tokenA = tokenARecords.get(mint);
       return tokenA?.type === "nft_like" && tokenA.metadata?.validOriginal;
@@ -652,6 +704,34 @@ async function enrichRecords(rawPairs: RawPair[], precursorCandidates: Set<strin
   });
   const linksByTokenA = groupLinksByMint(enrichedLinks, "tokenAMint");
   const linksByTokenB = new Map(enrichedLinks.map((link) => [link.tokenBMint, link]));
+  const manualPairLinks = new Map<string, ProvenancePair[]>();
+
+  for (const manualNft of manualNfts) {
+    if (!manualNft.tokenAMint || linksByTokenB.has(manualNft.mint)) {
+      continue;
+    }
+
+    const asset = tokenAAssets.get(manualNft.mint);
+    let tokenB = enrichTokenB(manualNft.mint, asset);
+    const manualTokenA = tokenARecords.get(manualNft.tokenAMint) ?? null;
+
+    tokenB = await withTokenBMintDate(tokenB, manualTokenA?.mintedAt);
+
+    if (manualNft.lifecycleStatus) {
+      tokenB = {
+        ...tokenB,
+        lifecycleStatus: manualNft.lifecycleStatus
+      };
+    }
+
+    const existing = manualPairLinks.get(manualNft.tokenAMint) ?? [];
+    existing.push({
+      entangledPairAddress: null,
+      tokenB,
+      swapped: false
+    });
+    manualPairLinks.set(manualNft.tokenAMint, existing);
+  }
 
   const originalTokens: OriginalTokenRecord[] = [];
   for (const mint of validOriginalMints) {
@@ -661,11 +741,12 @@ async function enrichRecords(rawPairs: RawPair[], precursorCandidates: Set<strin
       continue;
     }
 
-    const enrichedPairs = (linksByTokenA.get(mint) ?? []).map((link) => ({
+    const enrichedPairs: ProvenancePair[] = (linksByTokenA.get(mint) ?? []).map((link) => ({
       entangledPairAddress: link.entangledPairAddress,
       tokenB: link.tokenB,
       swapped: link.swapped
     }));
+    enrichedPairs.push(...(manualPairLinks.get(mint) ?? []));
 
     enrichedPairs.sort((a, b) => (a.tokenB.mintNumber ?? Number.MAX_SAFE_INTEGER) - (b.tokenB.mintNumber ?? Number.MAX_SAFE_INTEGER));
 
@@ -684,18 +765,28 @@ async function enrichRecords(rawPairs: RawPair[], precursorCandidates: Set<strin
   const nfts: NftRecord[] = [];
   for (const mint of validNftMints) {
     const link = linksByTokenB.get(mint);
+    const manualNft = manualNftsByMint.get(mint);
     let tokenB = link?.tokenB ?? enrichTokenB(mint, tokenAAssets.get(mint));
+    const manualTokenA = manualNft?.tokenAMint ? tokenARecords.get(manualNft.tokenAMint) ?? null : null;
 
-    tokenB = await withTokenBMintDate(tokenB, tokenARecords.get(mint)?.mintedAt);
+    tokenB = await withTokenBMintDate(tokenB, manualTokenA?.mintedAt ?? tokenARecords.get(mint)?.mintedAt);
 
-    if (!link && !isCompleteDirectNft(tokenB)) {
+    if (manualNft?.lifecycleStatus) {
+      tokenB = {
+        ...tokenB,
+        lifecycleStatus: manualNft.lifecycleStatus
+      };
+    }
+
+    if (!link && !manualNft && !isCompleteDirectNft(tokenB)) {
       continue;
     }
 
     nfts.push({
       tokenB,
-      tokenA: link?.tokenA ?? (link ? tokenARecords.get(link.tokenAMint) ?? null : null),
+      tokenA: link?.tokenA ?? manualTokenA ?? (link ? tokenARecords.get(link.tokenAMint) ?? null : null),
       entangledPairAddress: link?.entangledPairAddress ?? null,
+      provenanceBucket: manualNft?.provenanceBucket,
       swapped: link?.swapped ?? false
     });
   }
